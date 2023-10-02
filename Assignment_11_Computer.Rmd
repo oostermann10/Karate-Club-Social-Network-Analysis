@@ -1,0 +1,286 @@
+---
+title: "Assignment_11_Computer"
+author: 'Owen Ostermann: 7884571: B03'
+date: "9/12/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r, include = FALSE}
+if (!require(igraph))
+{
+  library("igraph")
+}
+```
+
+## Social Network of Friends in a Karate Club
+
+The graph "karate" contains the network of friendships between the 34 members of a karate club at a US university, as described by Wayne Zachary in 1977. The data comes from W. W. Zachary, An information flow model for conflict and fission in small groups, Journal of Anthropological Research 33, 452-473 (1977). The data was found online in a mtx file on https://networkrepository.com/soc-karate.php. I have converted the data into a csv file in which i have uploaded as well. The graph contains 34 nodes (the 34 members of the karate club) and 78 edges (the friendship connections between the members of the club). The graph is un-directed as it is assumed if one is a friend that it goes both ways between the members. 
+
+```{r, results = "hide"}
+karate = read.csv("Karate.csv")
+vertex_list = c()
+
+for (i in 1:nrow(karate))
+{
+  vertex_list = append(vertex_list,as.numeric(karate[[i,1]]))
+  vertex_list = append(vertex_list,as.numeric(karate[[i,2]]))
+}
+```
+
+First lets create a simple igraph object
+```{r}
+karate_graph = graph(vertex_list, directed = FALSE)
+karate_graph = simplify(karate_graph)
+plot(karate_graph, main = "Social Network of Friends in a Karate Club", 
+     vertex.color = "skyblue2", 
+     vertex.size = 12, edge.width = 0.5, vertex.label.cex = 0.7)
+```
+
+Some first observations from the graph. We can see that person 1,33,34 are very central in the graph. They appear to be popular ones in the karate club. Whereas person 17 or 12 are not very popular in the club. They have a small amount of edges corresponding to them. 
+
+## Eccentrcities and Related Measures
+We can observe the table that is the geodesic distances between the vertices in the graph. The geodesic distance is the length of the shortest path from one vertex in the graph to another. Since there are 34 vertices. The distance function produces a matrix of size 34 x 34. With the rows corresponding to vertices and then the column is the shortest path to the other vertices. For simplicity I am just showing the upper left 6x6 so we have a sense of how the geodisic table looks.
+
+```{r}
+dist = distances(karate_graph)
+dist[1:6,1:6]
+```
+From this table we can interpret the entries as connections. For example, in row 6, we observe that person 6 is directly friends with person 1 and the shortest path to get from vertex 6 to 1 is 1. But person 6 is not directly friends with person 2, they are friends with them through other person as the shortest path is 3 to get from vertex 6 to 2. The table does not give us information about who we have to go through to find connections between friendships, but this can be done with computing shortest paths between vertices. 
+
+We can calculate the eccentricities of the vertices. The eccentricity is the maximum distance
+from a vertex to any other vertex in the graph. 
+```{r}
+eccentricity = eccentricity(karate_graph)
+vertex = 1:34
+df = data.frame(vertex,eccentricity)
+df
+```
+
+```{r}
+radius(karate_graph)
+diameter(karate_graph)
+```
+From this table we can see that the maximum of the eccentricities is 5 (diameter), this means that the graph is pretty closely connected, in other words, the karate club is pretty close. 
+
+We can compute the central points of the graph to see which people could be "leaders" or "popular" in the karate club.
+```{r}
+central_points = which(radius(karate_graph) == df$eccentricity)
+central_points
+```
+This means that the above people are closely connected with other members of the club as the max distance to any other vertices from that person (the ones above) is 3. They are popular among the group. 
+
+Here we plot the set of central points in red. These are the people in the group who at maximum are friends with someone through two others, otherwise they are friends through one other person, or directly friends with a person. 
+```{r}
+V(karate_graph)[which(radius(karate_graph) == df$eccentricity)]$color = "red"
+V(karate_graph)[which(radius(karate_graph) != df$eccentricity)]$color = "skyblue2"
+plot(karate_graph, 
+     main = "Social Network of Friends in a Karate Club (Central Points in Red)", 
+     vertex.size = 12, edge.width = 0.5, vertex.label.cex = 0.7)
+```
+
+We can also plot the periphery points. Which is the set of vertices which achive the diameter. 
+
+```{r}
+periphery = which(diameter(karate_graph) == df$eccentricity)
+periphery
+```
+
+```{r}
+V(karate_graph)[which(diameter(karate_graph) == df$eccentricity)]$color = "purple"
+V(karate_graph)[which(diameter(karate_graph) != df$eccentricity)]$color = "skyblue2"
+plot(karate_graph, 
+     main = "Social Network of Friends in a Karate Club (Periphery in Purple)", 
+     vertex.size = 12, edge.width = 0.5, vertex.label.cex = 0.7)
+```
+
+Putting the two graphs together to observe the central and periphery points of the network. 
+
+```{r}
+V(karate_graph)[which(radius(karate_graph) == df$eccentricity)]$color = "red"
+V(karate_graph)[which(diameter(karate_graph) == df$eccentricity)]$color = "purple"
+plot(karate_graph, 
+     main = "Social Network of Friends in a Karate Club", 
+     vertex.size = 12, edge.width = 0.5, vertex.label.cex = 0.7)
+```
+
+# Girth
+The girth is the total number of edges in the shortest cycle of a graph. 
+```{r}
+girth(karate_graph)
+```
+The girth is 3 and it includes person 1, 2, and 3. This means that a possible shortest cycle is between those three people. They are a smaller group within the club that are connected and close friends. 
+
+The density of a graph is the fraction of maximum number of edges. If the graph has p edges and n vertices then its density is (2p/n(n-1)).
+
+```{r}
+edge_density(karate_graph)*100
+```
+Here 13.7% of possible edges are present in the network. This is a small fraction and tells us that there is not a large amount of direct friendships within the karate club. 
+
+## Connectedness
+
+Lets check to see if the graph is connected or not. 
+```{r}
+is.connected(karate_graph)
+```
+Thus the graph is connected. Lets see if there are any vertices that if we remove it makes the graph disconnected. 
+
+```{r}
+articulation_points(karate_graph)
+```
+We see that member number one, if removed would make the graph disconnected. Thus we could assume that member one has a large amount of friendships in the group and that if removed the group is not connected, that is not everyone has a mutual link anymore. 
+
+```{r}
+V(karate_graph)$name = V(karate_graph)
+karate_graph_disconnected = delete_vertices(karate_graph, 1)
+plot(karate_graph_disconnected, 
+     main = "Disconnected Network without Articulation Point (Member 1)", 
+     vertex.color = "skyblue2", vertex.size = 12, edge.width = 0.5, 
+     vertex.label.cex = 0.7)
+
+# connected? 
+is_connected(karate_graph_disconnected)
+```
+
+Clearly the removal of member 1 creates 3 different social groups upon the karate club. Member 1 was member 12's only link to the bigger portion of the graph, as well member 1 was the group containing 17,7,6,5, and 11's only link to the larger portion of the group. 
+
+## Cliques
+
+A clique is a sub graph of the original graph in which all vertices in the sub-graph are adjacent. With regards to the karate club, this is what the name suggests. It shows social groups within the karate club. Below shows one of the largest cliques in the karate club.
+
+```{r}
+lc = largest_cliques(karate_graph)
+clique = lc[[1]]
+clique
+
+V(karate_graph)$color = "skyblue2"
+V(karate_graph)[clique]$color = "yellow"
+plot(karate_graph, 
+     main = "Cliques Within Karate Club", 
+     vertex.size = 12, edge.width = 0.5, 
+     vertex.label.cex = 0.7)
+```
+
+## Centrality and Degrees
+
+```{r}
+degree(karate_graph)
+```
+We see that some of the members with the largest degrees are member 1,2,3,33, and 34. This means that these members have the most friendships in the karate club. Lets view the average distribution of degrees in the network. 
+
+```{r}
+distribution = degree_distribution(karate_graph)
+y_max = max(distribution)
+plot(distribution, type = "l", lwd = 2, col = "black", 
+     ylim = c(0,y_max), xlab = "degree number", ylab = "probability", 
+     main = "Degree Distribution of Karate Club Members")
+```
+
+The degree distribution is a probability distribution of the degrees throughout the graph. We see that on average from the distribution that most members have between 3-7 friends in the karate club (adjacent edges between vertices). 
+
+Lets look at the nearest neighbors in the graph. Below is the average of nearest neigbours for each member. 
+```{r}
+knn = knn(karate_graph)
+knn$knn
+```
+The values above measure the average friendships of each member in the karate club.
+
+## Coreness 
+The k-core of a graph is a maximal sub graph in which each vertex has degree at least K. 
+```{r}
+core = coreness(karate_graph)
+core
+```
+```{r}
+plot(core, 
+     main = "Frequency of Coreness Values in Karate Club", 
+     xlab = "Member Number", pch = 19, ylab = "Coreness Value")
+```
+
+This measures the sparsity of the graph. A sparse graph is one in which there are few edges. Above we can see that the coreness of the karate club network only has one k-core with a value of 1 (vertex 13). Thus the karate club network is relatively connected (rarely any member has only one friend within the club).
+
+## Betweenness
+Betweeness is the measure of centrality in a graph based on the shortest paths. We can interpret this with respect to the karate club as the connectedness and closeness of the club members. A high betweenss means that member is central and a member that has a high influence in the network on mutual friendships (connections between members). 
+
+```{r}
+between = betweenness(karate_graph)
+between
+```
+We observe that member 1, 3, 32, 33, and 34 have high betweeness. They create a lot of mutual friendships between other members within the karate club. 
+
+```{r}
+plot(between, pch = 19, 
+     main = "Distribution of Betweeness Scores Amoung Members of Karate Club", 
+     ylab = "Betweeness Score", xlab = "Member Number")
+```
+
+
+## Closeness 
+The closeness of a vertex is a measure of centrality in a network, it is calculated as the sum of the length of the shortest paths between the vertex and all other vertices in the graph. Thus the more central a vertex is, the closer it is to all other vertices. Ones with a high closeness score have the shortest distances to all other vertices. With respect to the karate club, these are the members with the most strong connection. In other words these are the people with friendships with the most amount of other members and through the smallest amount of other members, they have more direct friendships.
+```{r}
+closeness_scores = closeness(karate_graph)
+closeness_scores
+
+max(closeness_scores)
+```
+We see that member 1, as expected (the most central member to the network) has the highest closeness score. 
+
+## PageRank Algorithim 
+The page rank algorithm concept is a way in which a social network vertex can be given an "importance score". With respect to our karate club social network each member is assigned an "importance score" in which we display below. The sum of all of the scores is 1, which is also show below.
+```{r}
+page_rank = page_rank(karate_graph)
+page_rank$vector
+sum(page_rank$vector)
+max(page_rank$vector)
+```
+```{r}
+y_max = max(page_rank$vector)
+plot(page_rank$vector, type = "l", lwd = 2, col = "black", 
+     ylim = c(0,y_max), xlab = "Member Number", 
+     ylab = "PageRank Score",
+     main = "PageRank EigenCentrality Distribution")
+```
+
+From the following distribution we can see that members 1 and 34 have the highest pageRank score. We can say that those members are important in the network with regards to centrality. Members 1 to 5 and 30 to 34 have the highest pageRank scores. 
+
+## Dijkstra's Algorithim
+Another final interesting way to see the paths between members of the karate club is to use Dijkstra's algorithm. We can see the friendship links between members of the group. 
+
+How is member 1 friends with member 25?
+```{r}
+one_to_twofive = shortest_paths(karate_graph, from = V(karate_graph)[1], 
+                                to = V(karate_graph)[25], weights = NULL)
+one_to_twofive$vpath
+```
+Member 1 is mutual friends with member 25 through member 32.
+
+How is member 1 friends with member 27?
+```{r}
+one_to_twoseven = shortest_paths(karate_graph, from = V(karate_graph)[1], 
+                                 to = V(karate_graph)[27], weights = NULL)
+one_to_twoseven$vpath
+```
+Member 1 is friends with member 27 through members 9 and 34. 
+
+With the shortest paths function in R, we can replace the from and to parameters to get the links of friendships in the karate club between any two vertices in the social network.
+
+```{r}
+path = c(1,9,34,27)
+edges = c(E(karate_graph)[7], E(karate_graph)[43], E(karate_graph)[67])
+V(karate_graph)$color = "skyblue2"
+E(karate_graph)$color = "grey"
+V(karate_graph)[which(V(karate_graph) %in% path)]$color = "red"
+E(karate_graph)[which(E(karate_graph) %in% edges)]$color = "red"
+plot(karate_graph, main = "Dijkstra's Algorithim on Karate Club - 1 to 27", 
+     vertex.size = 5, edge.width = 0.5, vertex.label = NA)
+```
+
+For example here is a scaled down representation of the shortest path from member 1 to 27 in the graph. This is an example of a shortest path algorithm applied and plotted on the network.  
+
+
